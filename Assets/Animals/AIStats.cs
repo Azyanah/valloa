@@ -4,7 +4,7 @@ using UnityEngine;
 
 namespace Animals
 {
-    [CreateAssetMenu(fileName = "New Wander Stats", menuName = "PolyPerfect/New Wander Stats", order = 1)]
+    [CreateAssetMenu(fileName = "New Wander Stats", menuName = "Animals/New Wander Stats", order = 1)]
     public class AIStats : ScriptableObject
     {
         [SerializeField, Tooltip("How dominent this is in the food chain, more agressive will attack less dominant.")]
