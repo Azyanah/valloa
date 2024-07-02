@@ -46,11 +46,12 @@ namespace Environement
                 );
 
                 // Effectuer un raycast vers le bas pour trouver la surface de la plateforme
-                if (Physics.Raycast(randomPosition, Vector3.down, out RaycastHit hit))
-                {
+                if (Physics.Raycast(randomPosition, Vector3.down, out RaycastHit hit)) {
                     GameObject objectToSpawn = objectsToSpawn[Random.Range(0, objectsToSpawn.Length)];
 
                     GameObject spawnedObject = Instantiate(objectToSpawn, hit.point, Quaternion.identity);
+                    // set random rotation
+                    spawnedObject.transform.Rotate(Vector3.up, Random.Range(0, 360));
                     objects.Add(spawnedObject);
                 
                     StartCoroutine(GrowObject(spawnedObject));

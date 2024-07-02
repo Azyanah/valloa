@@ -35,8 +35,7 @@ namespace Animals
         public float MaxDistance
         {
             get { return wanderZone; }
-            set
-            {
+            set {
 #if UNITY_EDITOR
                 SceneView.RepaintAll();
 #endif
@@ -80,9 +79,6 @@ namespace Animals
 
         [SerializeField, Tooltip("If true, this animal will never leave it's zone, even if it's chasing or running away from another animal.")]
         private bool constainedToWanderZone = false;
-
-        [SerializeField, Tooltip("This animal will be peaceful towards species in this list.")]
-        private string[] nonAgressiveTowards;
         
         [SerializeField, Tooltip("This animal will not be peaceful towards species in this list.")]
         private string[] agressiveTowards;
@@ -171,8 +167,7 @@ namespace Animals
             if (!showGizmos)
                 return;
 
-            if (drawWanderRange)
-            {
+            if (drawWanderRange) {
                 // Draw circle of radius wander zone
                 Gizmos.color = distanceColor;
                 Gizmos.DrawWireSphere(origin == Vector3.zero ? transform.position : origin, wanderZone);
@@ -181,8 +176,7 @@ namespace Animals
                 Gizmos.DrawIcon(IconWander, "ico-wander", true);
             }
 
-            if (drawAwarenessRange)
-            {
+            if (drawAwarenessRange) {
                 //Draw circle radius for Awarness.
                 Gizmos.color = awarnessColor;
                 Gizmos.DrawWireSphere(transform.position, awareness);
@@ -235,7 +229,7 @@ namespace Animals
             animator = GetComponent<Animator>();
 
             var runtimeController = animator.runtimeAnimatorController;
-            if (animator)
+            if (animator && animator.runtimeAnimatorController)
                 animatorParameters.UnionWith(animator.parameters.Select(p=>p.name));
             
             foreach (IdleState state in idleStates)
@@ -266,8 +260,7 @@ namespace Animals
             originalScent = scent;
             scent = originalScent;
 
-            if (navMeshAgent)
-            {
+            if (navMeshAgent) {
                 useNavMesh = true;
                 navMeshAgent.stoppingDistance = contingencyDistance;
             }
@@ -280,8 +273,7 @@ namespace Animals
 
         IEnumerable<AIState> AllStates
         {
-            get
-            {
+            get {
                 foreach (var item in idleStates)
                     yield return item;
                 foreach (var item in movementStates)
@@ -316,7 +308,7 @@ namespace Animals
         readonly HashSet<string> animatorParameters = new HashSet<string>();
 
         void Update() {
-            if (!started)
+            if (!started || CurrentState == WanderState.Dead)
                 return;
             if (forceUpdate) {
                 UpdateAI();
@@ -342,8 +334,11 @@ namespace Animals
 
             if (attackTimer > attackSpeed) {
                 attackTimer -= attackSpeed;
-                if (attackTarget)
+                if (attackTarget) {
                     attackTarget.TakeDamage(power);
+                    if (attackTarget.CurrentState == WanderState.Dead)
+                        food += 20f;
+                }
                 if (attackTarget.CurrentState == WanderState.Dead) 
                     UpdateAI();
             }
@@ -372,7 +367,7 @@ namespace Animals
 
                     FaceDirection((targetPosition - position).normalized);
                     stamina -= Time.deltaTime;
-                    if (stamina<=0f)
+                    if (stamina <= 0f)
                         UpdateAI();
                     break;
                 case WanderState.Evade:
@@ -410,7 +405,7 @@ namespace Animals
                 navMeshAgent.destination = targetPosition;
                 navMeshAgent.speed = moveSpeed;
                 navMeshAgent.angularSpeed = turnSpeed;
-            } else
+            } else if (characterController.enabled)
                 characterController.SimpleMove(moveSpeed * UnityEngine.Vector3.ProjectOnPlane(targetPosition - position,Vector3.up).normalized);
         }
 
@@ -423,12 +418,66 @@ namespace Animals
         public void TakeDamage(float damage)
         {
             toughness -= damage;
-            if (toughness <= 0f)
+            if (toughness <= 0f) {
                 Die();
+            }
         }
+
         public void Die()
         {
+            List<Material> materials = new List<Material>();
+            MeshRenderer[] meshRenderers = GetComponentsInChildren<MeshRenderer>();
+
+            foreach (MeshRenderer meshRenderer in meshRenderers) {
+                foreach (Material material in meshRenderer.materials) {
+                    // Assure-toi que le matériau supporte la transparence
+                    if (material.shader.name == "Standard") {
+                        material.SetFloat("_Mode", 3); // Mode transparent
+                        material.SetInt("_SrcBlend", (int)UnityEngine.Rendering.BlendMode.SrcAlpha);
+                        material.SetInt("_DstBlend", (int)UnityEngine.Rendering.BlendMode.OneMinusSrcAlpha);
+                        material.SetInt("_ZWrite", 0);
+                        material.DisableKeyword("_ALPHATEST_ON");
+                        material.EnableKeyword("_ALPHABLEND_ON");
+                        material.DisableKeyword("_ALPHAPREMULTIPLY_ON");
+                        material.renderQueue = 3000;
+                    }
+                    materials.Add(material);
+                }
+            }
+
+            Renderer renderer = GetComponent<Renderer>();
+            if (renderer != null)
+                materials.AddRange(renderer.materials);
+            for (int i = 0; i < materials.Count; i++) {
+                Material material = materials[i];
+                StartCoroutine(FadeOutRoutine(material, 0f, 2f));
+            }
+            //Destroy(gameObject);
             SetState(WanderState.Dead);
+        }
+        
+        private IEnumerator FadeOutRoutine(Material material, float targetOpacity, float duration)
+        {
+            Color initialColor = material.color;
+            float currentOpacity = material.color.a;
+            float startOpacity = currentOpacity;
+            float time = 0;
+
+            while (time < duration) {
+                time += Time.deltaTime;
+                float blend = Mathf.Clamp01(time / duration);
+                Color color = material.color;
+                color.a = Mathf.Lerp(startOpacity, targetOpacity, blend);
+                material.color = color;
+                yield return null;
+            }
+
+            Color finalColor = material.color;
+            finalColor.a = targetOpacity;
+            material.color = finalColor;
+
+            enabled = false;
+            Destroy(gameObject);
         }
 
         public void SetPeaceTime(bool peace)
@@ -492,13 +541,14 @@ namespace Animals
                     var closestDistance = scent;
                     foreach (var potentialPrey in allAnimals) {
                         if (potentialPrey.CurrentState == WanderState.Dead)
-                            Debug.LogError(string.Format("Dead animal found: {0}", potentialPrey.gameObject.name));
+                            continue;
                         if (potentialPrey == this || (potentialPrey.species == species && !territorial) ||
                             potentialPrey.dominance > dominance || potentialPrey.stealthy)
                             continue;
                         if (!agressiveTowards.Contains(potentialPrey.species))
                             continue;
-                        if (Random.Range(0f,0.99999f) >= aggFrac)
+                        
+                        if (Random.Range(0f,0.99999f) >= aggFrac && food > 60f)
                             continue;
                         
                         var preyPosition = potentialPrey.transform.position;
@@ -631,7 +681,6 @@ namespace Animals
             deathEvent.Invoke();
             if (navMeshAgent && navMeshAgent.isOnNavMesh)
                 navMeshAgent.destination = transform.position;
-            enabled = false;
         }
 
         void HandleBeginAttack()
@@ -680,11 +729,9 @@ namespace Animals
         {
             MovementState moveState = null;
             var minSpeed = float.MaxValue;
-            foreach (var state in movementStates)
-            {
+            foreach (var state in movementStates) {
                 var stateSpeed = state.moveSpeed;
-                if (stateSpeed < minSpeed)
-                {
+                if (stateSpeed < minSpeed) {
                     moveState = state;
                     minSpeed = stateSpeed;
                 }
@@ -748,7 +795,7 @@ namespace Animals
 
         IEnumerator ConstantTicking(float delay)
         {
-            while (true) {
+            while (enabled && CurrentState != WanderState.Dead) {
                 UpdateAI();
                 yield return new WaitForSeconds(delay);
             }

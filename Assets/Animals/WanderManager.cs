@@ -59,7 +59,7 @@ namespace Animals
       peaceTime = enabled;
 
       Debug.Log(string.Format("AnimalManager: Peace time is now {0}.", enabled ? "On" : "Off"));
-			foreach (WanderScript animal in WanderScript.AllAnimals)
+			foreach (AgentBehaviour animal in AgentBehaviour.AllAnimals)
       {
         animal.SetPeaceTime(enabled);
       }
@@ -67,7 +67,7 @@ namespace Animals
 
     public void Nuke()
     {
-			foreach (WanderScript animal in WanderScript.AllAnimals)
+			foreach (AgentBehaviour animal in AgentBehaviour.AllAnimals)
       {
         animal.Die();
       }
