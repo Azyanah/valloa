@@ -1,4 +1,4 @@
-﻿using System;
+﻿    using System;
 using UnityEngine;
 using System.Collections;
 using System.Collections.Generic;
@@ -754,6 +754,7 @@ namespace Animals
                         HandleBeginEvade();
                         break;
                     case WanderState.Attack:
+                        print("ATTACK");
                         HandleBeginAttack();
                         break;
                     case WanderState.Dead:

@@ -613,7 +613,8 @@ namespace Polyperfect.Common
                         var distance = Vector3.Distance(position, chaser.transform.position);
                         if ((chaser.attackTarget!=this&&chaser.stealthy) || chaser.dominance <= this.dominance || distance > closestDistance)
                             continue;
-                        
+/*                        print("ATTACK : " + distance + closestDistance);
+*/                        print("test '" +  chaser.attackTarget + "'");
                         closestDistance = distance;
                         primaryPursuer = chaser;
                     }
