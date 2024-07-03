@@ -140,6 +140,8 @@ MonoBehaviour:
   species: Plants
   stats: {fileID: 11400000, guid: 042e5ed45632a4ae69bb0f1c5cb710fa, type: 2}
   wanderZone: 0
+  scalePlantInvincible: 10
+  defend: 0
   awareness: 0
   scent: 0
   constainedToWanderZone: 0
@@ -165,6 +167,7 @@ MonoBehaviour:
   food: 100
   hungerPS: 1
   CurrentState: 0
+  attackReach: 2
 --- !u!1 &7209958949695466915
 GameObject:
   m_ObjectHideFlags: 0

@@ -32,6 +32,11 @@ namespace Animals
         [SerializeField, Tooltip("How far away from it's origin this animal will wander by itself.")]
         private float wanderZone = 10f;
 
+        [SerializeField, Tooltip("If it's true and it's a plant it will NOT be eaten when it's becomming an adult.")]
+        public float scalePlantInvincible = 10f;
+
+        public bool defend = false;
+
         public float MaxDistance
         {
             get { return wanderZone; }
@@ -153,7 +158,7 @@ namespace Animals
         AgentBehaviour primaryPursuer;
         AgentBehaviour attackTarget;
         float moveSpeed = 0f;
-        float attackReach =2f;
+        public float attackReach =2f;
         bool forceUpdate = false;
         float idleStateDuration;
         Vector3 startPosition;
@@ -265,8 +270,7 @@ namespace Animals
                 navMeshAgent.stoppingDistance = contingencyDistance;
             }
 
-            if (matchSurfaceRotation && transform.childCount > 0)
-            {
+            if (matchSurfaceRotation && transform.childCount > 0) {
                 transform.GetChild(0).gameObject.AddComponent<SurfaceRotation>().SetRotationSpeed(surfaceRotationSpeed);
             }
         }
@@ -323,6 +327,8 @@ namespace Animals
 
             if (CurrentState == WanderState.Attack) {
                 if (!attackTarget || attackTarget.CurrentState == WanderState.Dead) {
+                    if (attackTarget.CurrentState == WanderState.Dead)
+                        food += 20;
                     var previous = attackTarget;
                     UpdateAI();
                     if (previous && previous == attackTarget)
@@ -334,13 +340,12 @@ namespace Animals
 
             if (attackTimer > attackSpeed) {
                 attackTimer -= attackSpeed;
-                if (attackTarget) {
+                if (attackTarget)
                     attackTarget.TakeDamage(power);
-                    if (attackTarget.CurrentState == WanderState.Dead)
-                        food += 20f;
-                }
-                if (attackTarget.CurrentState == WanderState.Dead) 
+                if (attackTarget.CurrentState == WanderState.Dead) {
+                    food += 20;
                     UpdateAI();
+                }
             }
 
             var position = transform.position;
@@ -394,7 +399,7 @@ namespace Animals
                     break;
                 case WanderState.Idle:
                     stamina = Mathf.MoveTowards(stamina, stats.stamina, Time.deltaTime);
-                    if (Time.time>=idleUpdateTime) {
+                    if (Time.time >= idleUpdateTime || food < 50f) {
                         SetState(WanderState.Wander);
                         UpdateAI();
                     }
@@ -512,7 +517,7 @@ namespace Animals
                         if (chaser.CurrentState == WanderState.Dead)
                             continue;
                         var distance = Vector3.Distance(position, chaser.transform.position);
-                        if ((chaser.attackTarget!=this&&chaser.stealthy) || chaser.dominance <= this.dominance || distance > closestDistance)
+                        if ((chaser.attackTarget!=this && chaser.stealthy) || chaser.dominance <= this.dominance || distance > closestDistance)
                             continue;
                         
                         closestDistance = distance;
@@ -581,7 +586,7 @@ namespace Animals
 
             var updateTargetAI = false;
             var isPreyInAttackRange = aggressiveOption && Vector3.Distance(position, primaryPrey.transform.position) < CalcAttackRange(primaryPrey);
-            var isPursuerInAttackRange = defensiveOption && Vector3.Distance(position, primaryPursuer.transform.position) < CalcAttackRange(primaryPursuer);
+            var isPursuerInAttackRange = defensiveOption && defend && Vector3.Distance(position, primaryPursuer.transform.position) < CalcAttackRange(primaryPursuer);
             if (isPursuerInAttackRange) {
                 attackTarget = primaryPursuer;
             } else if (isPreyInAttackRange) {

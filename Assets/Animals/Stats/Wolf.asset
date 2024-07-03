@@ -10,13 +10,13 @@ MonoBehaviour:
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 31ffdea728b84ef68713f113eb39221e, type: 3}
-  m_Name: Rabbit
+  m_Name: Wolf
   m_EditorClassIdentifier: 
-  dominance: 1
-  stamina: 25
-  power: 1
-  toughness: 6
-  agression: 1.7
-  attackSpeed: 1
+  dominance: 10
+  stamina: 30
+  power: 25
+  toughness: 50
+  agression: 6
+  attackSpeed: 2
   territorial: 0
   stealthy: 0
