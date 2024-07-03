@@ -137,7 +137,8 @@ namespace Polyperfect.Common
             Chase,
             Evade,
             Attack,
-            Dead
+            Dead,
+            Reproduction,
         }
 
         float attackTimer = 0;
@@ -149,6 +150,11 @@ namespace Polyperfect.Common
         float MinimumStaminaForFlee
         {
             get { return stats.stamina * .1f; }
+        }
+
+        float MinimumStaminaForReproduction
+        {
+            get { return stats.stamina * .9f; }
         }
 
         public WanderState CurrentState;
@@ -507,8 +513,31 @@ namespace Polyperfect.Common
 
                     FaceDirection((targetPosition - position).normalized);
                     stamina -= Time.deltaTime;
-                    if (stamina<=0f)
+                    if (stamina <= 0f)
                         UpdateAI();
+                    break;
+                case WanderState.Reproduction:
+                    if (!primaryPrey || primaryPrey.CurrentState == WanderState.Dead)
+                    {
+                        primaryPrey = null;
+                        SetState(WanderState.Idle);
+                        goto case WanderState.Idle;
+                    }
+                    targetPosition = primaryPrey.transform.position;
+                    ValidatePosition(ref targetPosition);
+                    if (!IsValidLocation(targetPosition))
+                    {
+                        SetState(WanderState.Idle);
+                        targetPosition = position;
+                        UpdateAI();
+                        break;
+                    }
+
+                    FaceDirection((targetPosition - position).normalized);
+                    stamina -= (Time.deltaTime * 5);
+                    if (stamina <= 0f) {
+                        UpdateAI();
+                    }
                     break;
                 case WanderState.Evade:
                     targetPosition = position + Vector3.ProjectOnPlane(position - primaryPursuer.transform.position, Vector3.up);
@@ -572,7 +601,7 @@ namespace Polyperfect.Common
             SetState(WanderState.Dead);
         }
 
-        public void SetPeaceTime(bool peace)
+        public void SetPeaceTime(bool peace) // Mettre un temps de pause après la reproduction de 2 mins pour pas spam
         {
             if (peace)
             {
@@ -587,7 +616,7 @@ namespace Polyperfect.Common
                 aggression = originalAggression;
             }
         }
-        
+
         void UpdateAI()
         {
             if (CurrentState == WanderState.Dead)
@@ -598,28 +627,34 @@ namespace Polyperfect.Common
 
             var position = transform.position;
             primaryPursuer = null;
-            if (awareness > 0)
+           /* if (awareness > 0)
             {
                 var closestDistance = awareness;
                 if (allAnimals.Count > 0)
                 {
+                    int sameSpeciesPursuersCount = 0;
                     foreach (var chaser in allAnimals)
                     {
                         if (chaser.primaryPrey != this && chaser.attackTarget != this)
                             continue;
 
-                        if (chaser.CurrentState == WanderState.Dead)
+                        if (chaser.CurrentState == WanderState.Dead || chaser.CurrentState == WanderState.Reproduction)
                             continue;
+                        if (chaser.species != this.species)
+                            continue;
+
+                        sameSpeciesPursuersCount++;
+                        if (sameSpeciesPursuersCount > 2)
+                            break;
+                        print(sameSpeciesPursuersCount + "    " + chaser.species);
                         var distance = Vector3.Distance(position, chaser.transform.position);
-                        if ((chaser.attackTarget!=this&&chaser.stealthy) || chaser.dominance <= this.dominance || distance > closestDistance)
+                        if ((chaser.attackTarget != this && chaser.stealthy) || distance > closestDistance)
                             continue;
-/*                        print("ATTACK : " + distance + closestDistance);
-*/                        print("test '" +  chaser.attackTarget + "'");
                         closestDistance = distance;
                         primaryPursuer = chaser;
                     }
                 }
-            }
+            }*/
 
             var wasSameTarget = false;
             if (primaryPrey)
@@ -635,46 +670,37 @@ namespace Polyperfect.Common
                         wasSameTarget = true;
                 }
             }
-            if (!primaryPrey)
+            if (!primaryPrey) // Vérifier la dominance pour indiquer que l'animal peut être en reproduction ou non
             {
                 primaryPrey = null;
-                if (dominance > 0 && attackingStates.Length>0)
+
+                var closestDistance = 5f;
+                foreach (var potentialPrey in allAnimals)
                 {
-                    var aggFrac = aggression * .01f;
-                    aggFrac *= aggFrac;
-                    var closestDistance = scent;
-                    foreach (var potentialPrey in allAnimals)
-                    {
-                        if (potentialPrey.CurrentState == WanderState.Dead)
-                            Debug.LogError(string.Format("Dead animal found: {0}", potentialPrey.gameObject.name));
-                        if (potentialPrey == this || (potentialPrey.species == species && !territorial) ||
-                            potentialPrey.dominance > dominance || potentialPrey.stealthy)
-                            continue;
-                        if (nonAgressiveTowards.Contains(potentialPrey.species))
-                            continue;
-                        if (Random.Range(0f,0.99999f) >= aggFrac)
-                            continue;
-                        
-                        var preyPosition = potentialPrey.transform.position;
-                        if (!IsValidLocation(preyPosition)) 
-                            continue;
+                    if (potentialPrey.CurrentState == WanderState.Dead)
+                        Debug.LogError(string.Format("Dead animal found: {0}", potentialPrey.gameObject.name));
+                    if (potentialPrey == this || potentialPrey.species != species)
+                        continue;
 
-                        var distance = Vector3.Distance(position, preyPosition);
-                        if (distance > closestDistance)
-                            continue;
-                        if (logChanges)
-                            Debug.Log(string.Format("{0}: Found prey ({1}), chasing.", gameObject.name, potentialPrey.gameObject.name));
+                    var preyPosition = potentialPrey.transform.position;
+                    if (!IsValidLocation(preyPosition))
+                        continue;
 
-                        closestDistance = distance;
-                        primaryPrey = potentialPrey;
-                    }
+                    var distance = Vector3.Distance(position, preyPosition);
+                    if (distance > closestDistance)
+                        continue;
+                    if (logChanges)
+                        Debug.Log(string.Format("{0}: Found prey ({1}), chasing.", gameObject.name, potentialPrey.gameObject.name));
+
+                    closestDistance = distance;
+                    primaryPrey = potentialPrey;
                 }
             }
 
             var aggressiveOption = false;
             if (primaryPrey)
             {
-                if ((wasSameTarget&&stamina>0) || stamina > MinimumStaminaForAggression)
+                if ((wasSameTarget && stamina > 0) || stamina > MinimumStaminaForReproduction)
                     aggressiveOption = true;
                 else
                     primaryPrey = null;
@@ -697,23 +723,48 @@ namespace Polyperfect.Common
             else if (isPreyInAttackRange)
             {
                 attackTarget = primaryPrey;
-                if (!attackTarget.attackTarget==this)
+                if (!attackTarget.attackTarget == this)
                     updateTargetAI = true;
             }
             else
                 attackTarget = null;
             var shouldAttack = attackingStates.Length > 0 && (isPreyInAttackRange || isPursuerInAttackRange);
 
-            if (shouldAttack)
+            if (shouldAttack) {
+                print("             Should attack");
                 SetState(WanderState.Attack);
-            else if (aggressiveOption)
-                SetState(WanderState.Chase);
-            else if (defensiveOption)
+            }
+            else if (aggressiveOption) {
+                SetState(WanderState.Reproduction);              
+            }
+            else if (defensiveOption) {
                 SetState(WanderState.Evade);
-            else if (CurrentState!= WanderState.Idle && CurrentState != WanderState.Wander)
-                SetState(WanderState.Idle);
-            if (shouldAttack&&updateTargetAI) 
-                attackTarget.forceUpdate = true;
+            }
+            else if (CurrentState != WanderState.Idle && CurrentState != WanderState.Wander) {
+                print("!= idle != wander");
+                SetState(WanderState.Wander);
+                StartCoroutine(GrowBaby());
+            }
+        }
+
+        IEnumerator GrowBaby()
+        {
+            float elapsedTime = 0;
+            Common_WanderScript baby = Instantiate<Common_WanderScript>(this);
+            // Vector3 originalScale = Vector3.zero;
+            // Vector3 targetScale = baby.transform.localScale;
+            // baby.transform.localScale = originalScale;
+            baby.stamina = 0;
+    
+            print("baby scale:" + baby.CurrentState + "      Parent scale : " + this.transform.localScale);
+            while (elapsedTime < 10.0f)
+            {
+                // baby.transform.localScale = Vector3.Lerp(originalScale, targetScale, elapsedTime / 5.0f);
+                elapsedTime += Time.deltaTime;
+                yield return null;
+            }
+            // Faire grossir les bébés
+            // baby.transform.localScale = targetScale;
         }
 
         bool IsValidLocation(Vector3 targetPosition)
@@ -762,6 +813,9 @@ namespace Polyperfect.Common
                         break;
                     case WanderState.Wander:
                         HandleBeginWander();
+                        break;
+                    case WanderState.Reproduction:
+                        HandleBeginChase();
                         break;
                     default:
                         throw new ArgumentOutOfRangeException();
