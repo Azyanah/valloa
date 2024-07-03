@@ -1,6 +1,7 @@
 using System;
 using System.Collections;
 using System.Collections.Generic;
+using Animals;
 using UnityEngine;
 using Random = UnityEngine.Random;
 
@@ -66,14 +67,22 @@ namespace Environement
             Vector3 targetScale = obj.transform.localScale;
             obj.transform.localScale = originalScale;
 
-            while (elapsedTime < growthDuration)
-            {
+            while (elapsedTime < growthDuration && obj != null) {
                 obj.transform.localScale = Vector3.Lerp(originalScale, targetScale, elapsedTime / growthDuration);
+                obj.transform.position = new Vector3(obj.transform.position.x, obj.transform.localScale.y / 2, obj.transform.position.z);
                 elapsedTime += Time.deltaTime;
                 yield return null;
             }
-
-            obj.transform.localScale = targetScale;
+            if (obj != null) {
+                obj.transform.localScale = targetScale;
+                if (obj.TryGetComponent(out Animals.AgentBehaviour agentBehaviour) && agentBehaviour.scalePlantInvincible <= 1) {
+                    agentBehaviour.enabled = false;
+                    if (agentBehaviour.CurrentState == AgentBehaviour.WanderState.Dead) {
+                        Destroy(obj);
+                        objects.Remove(obj);
+                    }
+                }
+            }
         }
     }
 }

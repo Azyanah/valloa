@@ -32,6 +32,11 @@ namespace Animals
         [SerializeField, Tooltip("How far away from it's origin this animal will wander by itself.")]
         private float wanderZone = 10f;
 
+        [SerializeField, Tooltip("If it's true and it's a plant it will NOT be eaten when it's becomming an adult.")]
+        public float scalePlantInvincible = 10f;
+
+        public bool defend = false;
+
         public float MaxDistance
         {
             get { return wanderZone; }
@@ -134,7 +139,8 @@ namespace Animals
             Chase,
             Evade,
             Attack,
-            Dead
+            Dead,
+            Reproduction,
         }
 
         float attackTimer = 0;
@@ -148,12 +154,17 @@ namespace Animals
             get { return stats.stamina * .1f; }
         }
 
+        float MinimumStaminaForReproduction
+        {
+            get { return stats.stamina * .9f; }
+        }
+
         public WanderState CurrentState;
         AgentBehaviour primaryPrey;
         AgentBehaviour primaryPursuer;
         AgentBehaviour attackTarget;
         float moveSpeed = 0f;
-        float attackReach =2f;
+        public float attackReach =2f;
         bool forceUpdate = false;
         float idleStateDuration;
         Vector3 startPosition;
@@ -265,8 +276,7 @@ namespace Animals
                 navMeshAgent.stoppingDistance = contingencyDistance;
             }
 
-            if (matchSurfaceRotation && transform.childCount > 0)
-            {
+            if (matchSurfaceRotation && transform.childCount > 0) {
                 transform.GetChild(0).gameObject.AddComponent<SurfaceRotation>().SetRotationSpeed(surfaceRotationSpeed);
             }
         }
@@ -323,6 +333,8 @@ namespace Animals
 
             if (CurrentState == WanderState.Attack) {
                 if (!attackTarget || attackTarget.CurrentState == WanderState.Dead) {
+                    if (attackTarget.CurrentState == WanderState.Dead)
+                        food += 20;
                     var previous = attackTarget;
                     UpdateAI();
                     if (previous && previous == attackTarget)
@@ -334,13 +346,12 @@ namespace Animals
 
             if (attackTimer > attackSpeed) {
                 attackTimer -= attackSpeed;
-                if (attackTarget) {
+                if (attackTarget)
                     attackTarget.TakeDamage(power);
-                    if (attackTarget.CurrentState == WanderState.Dead)
-                        food += 20f;
-                }
-                if (attackTarget.CurrentState == WanderState.Dead) 
+                if (attackTarget.CurrentState == WanderState.Dead) {
+                    food += 20;
                     UpdateAI();
+                }
             }
 
             var position = transform.position;
@@ -370,6 +381,29 @@ namespace Animals
                     if (stamina <= 0f)
                         UpdateAI();
                     break;
+                case WanderState.Reproduction:
+                    if (!primaryPrey || primaryPrey.CurrentState == WanderState.Dead)
+                    {
+                        primaryPrey = null;
+                        SetState(WanderState.Idle);
+                        goto case WanderState.Idle;
+                    }
+                    targetPosition = primaryPrey.transform.position;
+                    ValidatePosition(ref targetPosition);
+                    if (!IsValidLocation(targetPosition))
+                    {
+                        SetState(WanderState.Idle);
+                        targetPosition = position;
+                        UpdateAI();
+                        break;
+                    }
+
+                    FaceDirection((targetPosition - position).normalized);
+                    stamina -= (Time.deltaTime * 5);
+                    if (stamina <= 0f) {
+                        UpdateAI();
+                    }
+                    break;
                 case WanderState.Evade:
                     targetPosition = position + Vector3.ProjectOnPlane(position - primaryPursuer.transform.position, Vector3.up);
                     if (!IsValidLocation(targetPosition))
@@ -394,7 +428,7 @@ namespace Animals
                     break;
                 case WanderState.Idle:
                     stamina = Mathf.MoveTowards(stamina, stats.stamina, Time.deltaTime);
-                    if (Time.time>=idleUpdateTime) {
+                    if (Time.time >= idleUpdateTime || food < 50f) {
                         SetState(WanderState.Wander);
                         UpdateAI();
                     }
@@ -500,26 +534,29 @@ namespace Animals
                 return;
             }
 
+            if (species == "Tree" || species == "Plants")
+                return;
+
             var position = transform.position;
             primaryPursuer = null;
-            if (awareness > 0) {
-                var closestDistance = awareness;
-                if (allAnimals.Count > 0) {
-                    foreach (var chaser in allAnimals) {
-                        if (chaser.primaryPrey != this && chaser.attackTarget != this)
-                            continue;
+            // if (awareness > 0) {
+            //     var closestDistance = awareness;
+            //     if (allAnimals.Count > 0) {
+            //         foreach (var chaser in allAnimals) {
+            //             if (chaser.primaryPrey != this && chaser.attackTarget != this)
+            //                 continue;
 
-                        if (chaser.CurrentState == WanderState.Dead)
-                            continue;
-                        var distance = Vector3.Distance(position, chaser.transform.position);
-                        if ((chaser.attackTarget!=this&&chaser.stealthy) || chaser.dominance <= this.dominance || distance > closestDistance)
-                            continue;
+            //             if (chaser.CurrentState == WanderState.Dead)
+            //                 continue;
+            //             var distance = Vector3.Distance(position, chaser.transform.position);
+            //             if ((chaser.attackTarget!=this && chaser.stealthy) || chaser.dominance <= this.dominance || distance > closestDistance)
+            //                 continue;
                         
-                        closestDistance = distance;
-                        primaryPursuer = chaser;
-                    }
-                }
-            }
+            //             closestDistance = distance;
+            //             primaryPursuer = chaser;
+            //         }
+            //     }
+            // }
 
             var wasSameTarget = false;
             if (primaryPrey) {
@@ -535,42 +572,33 @@ namespace Animals
             }
             if (!primaryPrey) {
                 primaryPrey = null;
-                if (dominance > 0 && attackingStates.Length > 0) {
-                    var aggFrac = aggression * .01f;
-                    aggFrac *= aggFrac;
-                    var closestDistance = scent;
-                    foreach (var potentialPrey in allAnimals) {
-                        if (potentialPrey.CurrentState == WanderState.Dead)
-                            continue;
-                        if (potentialPrey == this || (potentialPrey.species == species && !territorial) ||
-                            potentialPrey.dominance > dominance || potentialPrey.stealthy)
-                            continue;
-                        if (!agressiveTowards.Contains(potentialPrey.species))
-                            continue;
+                var closestDistance = 5f;
+                foreach (var potentialPrey in allAnimals) {
+                    if (potentialPrey.CurrentState == WanderState.Dead)
+                        continue;
+                    if (potentialPrey == this || potentialPrey.species != species)
+                        continue;
+                    
+                    if (food < 60f)
+                        continue;
                         
-                        if (Random.Range(0f,0.99999f) >= aggFrac && food > 60f)
-                            continue;
-                        
-                        var preyPosition = potentialPrey.transform.position;
-                        if (!IsValidLocation(preyPosition)) 
-                            continue;
+                    var preyPosition = potentialPrey.transform.position;
+                    if (!IsValidLocation(preyPosition)) 
+                        continue;
 
-                        var distance = Vector3.Distance(position, preyPosition);
-                        if (distance > closestDistance)
-                            continue;
-                        
-                        closestDistance = distance;
-                        primaryPrey = potentialPrey;
-                    }
+                    var distance = Vector3.Distance(position, preyPosition);
+                    if (distance > closestDistance)
+                        continue;
+                    
+                    closestDistance = distance;
+                    primaryPrey = potentialPrey;
                 }
             }
 
             var aggressiveOption = false;
             if (primaryPrey) {
-                if ((wasSameTarget&&stamina>0) || stamina > MinimumStaminaForAggression)
+                if ((wasSameTarget && stamina > 0) || stamina > MinimumStaminaForReproduction)
                     aggressiveOption = true;
-                else
-                    primaryPrey = null;
             }
 
             var defensiveOption = false;
@@ -581,7 +609,7 @@ namespace Animals
 
             var updateTargetAI = false;
             var isPreyInAttackRange = aggressiveOption && Vector3.Distance(position, primaryPrey.transform.position) < CalcAttackRange(primaryPrey);
-            var isPursuerInAttackRange = defensiveOption && Vector3.Distance(position, primaryPursuer.transform.position) < CalcAttackRange(primaryPursuer);
+            var isPursuerInAttackRange = defensiveOption && defend && Vector3.Distance(position, primaryPursuer.transform.position) < CalcAttackRange(primaryPursuer);
             if (isPursuerInAttackRange) {
                 attackTarget = primaryPursuer;
             } else if (isPreyInAttackRange) {
@@ -593,16 +621,171 @@ namespace Animals
             var shouldAttack = attackingStates.Length > 0 && (isPreyInAttackRange || isPursuerInAttackRange);
 
             if (shouldAttack)
-                SetState(WanderState.Attack);
+                SetState(WanderState.Reproduction);
             else if (aggressiveOption)
-                SetState(WanderState.Chase);
+                SetState(WanderState.Reproduction);
             else if (defensiveOption)
                 SetState(WanderState.Evade);
-            else if (CurrentState!= WanderState.Idle && CurrentState != WanderState.Wander)
-                SetState(WanderState.Idle);
-            if (shouldAttack&&updateTargetAI) 
-                attackTarget.forceUpdate = true;
+            else if (CurrentState != WanderState.Idle && CurrentState != WanderState.Wander) {
+                if (primaryPrey && position.x > primaryPrey.transform.position.x)
+                    StartCoroutine(GrowBaby());
+                food /= 2;
+                SetState(WanderState.Wander);
+                return;
+            }
         }
+
+        // void UpdateAI()
+        // {
+        //     if (CurrentState == WanderState.Dead)
+        //     {
+        //         Debug.LogError("Trying to update the AI of a dead animal, something probably went wrong somewhere.");
+        //         return;
+        //     }
+
+        //     var position = transform.position;
+        //     primaryPursuer = null;
+        //    /* if (awareness > 0)
+        //     {
+        //         var closestDistance = awareness;
+        //         if (allAnimals.Count > 0)
+        //         {
+        //             int sameSpeciesPursuersCount = 0;
+        //             foreach (var chaser in allAnimals)
+        //             {
+        //                 if (chaser.primaryPrey != this && chaser.attackTarget != this)
+        //                     continue;
+
+        //                 if (chaser.CurrentState == WanderState.Dead || chaser.CurrentState == WanderState.Reproduction)
+        //                     continue;
+        //                 if (chaser.species != this.species)
+        //                     continue;
+
+        //                 sameSpeciesPursuersCount++;
+        //                 if (sameSpeciesPursuersCount > 2)
+        //                     break;
+        //                 print(sameSpeciesPursuersCount + "    " + chaser.species);
+        //                 var distance = Vector3.Distance(position, chaser.transform.position);
+        //                 if ((chaser.attackTarget != this && chaser.stealthy) || distance > closestDistance)
+        //                     continue;
+        //                 closestDistance = distance;
+        //                 primaryPursuer = chaser;
+        //             }
+        //         }
+        //     }*/
+
+        //     var wasSameTarget = false;
+        //     if (primaryPrey)
+        //     {
+        //         if (primaryPrey.CurrentState == WanderState.Dead)
+        //             primaryPrey = null;
+        //         else
+        //         {
+        //             var distanceToPrey = Vector3.Distance(position, primaryPrey.transform.position);
+        //             if (distanceToPrey > scent)
+        //                 primaryPrey = null;
+        //             else
+        //                 wasSameTarget = true;
+        //         }
+        //     }
+        //     if (!primaryPrey) // Vérifier la dominance pour indiquer que l'animal peut être en reproduction ou non
+        //     {
+        //         primaryPrey = null;
+
+        //         var closestDistance = 5f;
+        //         foreach (var potentialPrey in allAnimals)
+        //         {
+        //             if (potentialPrey.CurrentState == WanderState.Dead)
+        //                 Debug.LogError(string.Format("Dead animal found: {0}", potentialPrey.gameObject.name));
+        //             if (potentialPrey == this || potentialPrey.species != species)
+        //                 continue;
+
+        //             var preyPosition = potentialPrey.transform.position;
+        //             if (!IsValidLocation(preyPosition))
+        //                 continue;
+
+        //             var distance = Vector3.Distance(position, preyPosition);
+        //             if (distance > closestDistance)
+        //                 continue;
+        //             // if (logChanges)
+        //             //     Debug.Log(string.Format("{0}: Found prey ({1}), chasing.", gameObject.name, potentialPrey.gameObject.name));
+
+        //             closestDistance = distance;
+        //             primaryPrey = potentialPrey;
+        //         }
+        //     }
+
+        //     var aggressiveOption = false;
+        //     if (primaryPrey)
+        //     {
+        //         if ((wasSameTarget && stamina > 0) || stamina > MinimumStaminaForReproduction)
+        //             aggressiveOption = true;
+        //         else
+        //             primaryPrey = null;
+        //     }
+
+        //     var defensiveOption = false;
+        //     if (primaryPursuer && !aggressiveOption)
+        //     {
+        //         if (stamina > MinimumStaminaForFlee)
+        //             defensiveOption = true;
+        //     }
+
+        //     var updateTargetAI = false;
+        //     var isPreyInAttackRange = aggressiveOption && Vector3.Distance(position, primaryPrey.transform.position) < CalcAttackRange(primaryPrey);
+        //     var isPursuerInAttackRange = defensiveOption && Vector3.Distance(position, primaryPursuer.transform.position) < CalcAttackRange(primaryPursuer);
+        //     if (isPursuerInAttackRange)
+        //     {
+        //         attackTarget = primaryPursuer;
+        //     }
+        //     else if (isPreyInAttackRange)
+        //     {
+        //         attackTarget = primaryPrey;
+        //         if (!attackTarget.attackTarget == this)
+        //             updateTargetAI = true;
+        //     }
+        //     else
+        //         attackTarget = null;
+        //     var shouldAttack = attackingStates.Length > 0 && (isPreyInAttackRange || isPursuerInAttackRange);
+
+        //     if (shouldAttack) {
+        //         print("             Should attack");
+        //         SetState(WanderState.Attack);
+        //     }
+        //     else if (aggressiveOption) {
+        //         SetState(WanderState.Reproduction);              
+        //     }
+        //     else if (defensiveOption) {
+        //         SetState(WanderState.Evade);
+        //     }
+        //     else if (CurrentState != WanderState.Idle && CurrentState != WanderState.Wander) {
+        //         print("!= idle != wander");
+        //         SetState(WanderState.Wander);
+        //         StartCoroutine(GrowBaby());
+        //     }
+        // }
+
+        IEnumerator GrowBaby()
+        {
+            float elapsedTime = 0;
+            AgentBehaviour baby = Instantiate<AgentBehaviour>(this);
+            // Vector3 originalScale = Vector3.zero;
+            // Vector3 targetScale = baby.transform.localScale;
+            // baby.transform.localScale = originalScale;
+            baby.stamina = 0;
+            baby.food = 50;
+            baby.SetState(WanderState.Wander);
+    
+            while (elapsedTime < 10.0f)
+            {
+                // baby.transform.localScale = Vector3.Lerp(originalScale, targetScale, elapsedTime / 5.0f);
+                elapsedTime += Time.deltaTime;
+                yield return null;
+            }
+            // Faire grossir les bébés
+            // baby.transform.localScale = targetScale;
+        }
+
 
         bool IsValidLocation(Vector3 targetPosition)
         {
@@ -646,6 +829,9 @@ namespace Animals
                     break;
                 case WanderState.Wander:
                     HandleBeginWander();
+                    break;
+                case WanderState.Reproduction:
+                    HandleBeginChase();
                     break;
                 default:
                     throw new ArgumentOutOfRangeException();
