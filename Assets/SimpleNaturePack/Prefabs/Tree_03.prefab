@@ -115,7 +115,7 @@ GameObject:
   - component: {fileID: 4355761401392914105}
   m_Layer: 0
   m_Name: Tree_03_LOD0
-  m_TagString: Untagged
+  m_TagString: Item
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
@@ -235,9 +235,10 @@ GameObject:
   - component: {fileID: -9203473283981242596}
   - component: {fileID: -8605712042351776382}
   - component: {fileID: 510422887317651119}
+  - component: {fileID: -3049456706882935499}
   m_Layer: 0
   m_Name: Tree_03
-  m_TagString: Untagged
+  m_TagString: Item
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
@@ -390,3 +391,16 @@ MonoBehaviour:
   hungerPS: 1
   CurrentState: 0
   attackReach: 2
+--- !u!114 &-3049456706882935499
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 6941765000743290380}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: fa299b98c25846841b43d34506045ef7, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  fadeDuration: 0.5
