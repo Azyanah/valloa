@@ -62,21 +62,14 @@ public class InteractBehaviour : MonoBehaviour
 
     private IEnumerator HarvestAfterWait(Collider itemCollider)
     {
-        if (playerAnimator != null)
-        {
+        if (playerAnimator != null) {
             playerAnimator.SetTrigger("Harvest");
-            Debug.Log("Animation de récolte déclenchée");
-        }
-        else
-        {
-            Debug.LogWarning("playerAnimator est nul, animation non déclenchée");
         }
 
-        yield return new WaitForSeconds(3f);
+        yield return new WaitForSeconds(2f);
 
         Harvestable harvestable = itemCollider.GetComponentInParent<Harvestable>();
-        if (harvestable != null)
-        {
+        if (harvestable != null) {
             harvestable.Harvest(itemCollider.gameObject);
         }
         else

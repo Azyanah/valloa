@@ -37,8 +37,7 @@ namespace Environement
 
         void SpawnObjects()
         {
-            if (objects.Count < numberOfObjects)
-            {
+            if (objects.Count < numberOfObjects) {
                 // Déterminer une position aléatoire dans les limites de la plateforme
                 Vector3 randomPosition = new Vector3(
                     Random.Range(platformMin.x, platformMax.x),

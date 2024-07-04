@@ -51,6 +51,8 @@ namespace Animals
         // [SerializeField, Tooltip("How dominent this animal is in the food chain, agressive animals will attack less dominant animals.")]
         private int dominance = 1;
         private int originalDominance = 0;
+        
+        public float timeToDisappear = 2f;
 
         [SerializeField, Tooltip("How far this animal can sense a predator.")]
         private float awareness = 30f;
@@ -431,9 +433,9 @@ namespace Animals
         public void Die()
         {
             List<Material> materials = new List<Material>();
-            MeshRenderer[] meshRenderers = GetComponentsInChildren<MeshRenderer>();
+            Renderer[] meshRenderers = GetComponentsInChildren<Renderer>();
 
-            foreach (MeshRenderer meshRenderer in meshRenderers) {
+            foreach (Renderer meshRenderer in meshRenderers) {
                 foreach (Material material in meshRenderer.materials) {
                     // Assure-toi que le matériau supporte la transparence
                     if (material.shader.name == "Standard") {
@@ -455,7 +457,7 @@ namespace Animals
                 materials.AddRange(renderer.materials);
             for (int i = 0; i < materials.Count; i++) {
                 Material material = materials[i];
-                StartCoroutine(FadeOutRoutine(material, 0f, 2f));
+                StartCoroutine(FadeOutRoutine(material, 0f, timeToDisappear));
             }
             //Destroy(gameObject);
             SetState(WanderState.Dead);
@@ -467,7 +469,9 @@ namespace Animals
             float currentOpacity = material.color.a;
             float startOpacity = currentOpacity;
             float time = 0;
-
+            
+            yield return new WaitForSeconds(3f);
+            
             while (time < duration) {
                 time += Time.deltaTime;
                 float blend = Mathf.Clamp01(time / duration);

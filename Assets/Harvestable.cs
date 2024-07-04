@@ -10,10 +10,9 @@ public class Harvestable : MonoBehaviour
         Debug.Log("Récolte effectuée sur : " + item.name);
         StartCoroutine(FadeOutAndDestroy(item));
     }
-
     private IEnumerator FadeOutAndDestroy(GameObject item)
     {
-        // Activer la gravité pour faire tomber l'objet
+        // Ajouter et configurer le Rigidbody
         Rigidbody rb = item.GetComponent<Rigidbody>();
         if (rb == null)
         {
@@ -21,23 +20,33 @@ public class Harvestable : MonoBehaviour
         }
         rb.useGravity = true;
 
-        // Commencer le fondu
-        Renderer renderer = item.GetComponent<Renderer>();
-        if (renderer != null)
-        {
-            Color originalColor = renderer.material.color;
-            float fadeSpeed = 0.2f / fadeDuration;
+        // Attendre 3 secondes avant de commencer le fondu
+        yield return new WaitForSeconds(3f);
 
-            for (float t = 0; t < 1f; t += Time.deltaTime * fadeSpeed)
-            {
-                Color newColor = originalColor;
-                newColor.a = Mathf.Lerp(1f, 0f, t);
-                renderer.material.color = newColor;
-                yield return null;
-            }
+        // Début de l'animation de disparition
+        float startTime = Time.time;
+        fadeDuration = 10f;
+        float endTime = startTime + fadeDuration;
+        Vector3 startPosition = item.transform.position;
+        Vector3 endPosition = new Vector3(startPosition.x, -2, startPosition.z);
+
+        // Désactiver le Rigidbody pour permettre la manipulation de la position
+        rb.useGravity = false;
+        rb.isKinematic = true;
+        rb.detectCollisions = false;
+
+        while (Time.time < endTime)
+        {
+            float t = (Time.time - startTime) / fadeDuration;
+            item.transform.position = Vector3.Lerp(startPosition, endPosition, t);
+            yield return null; // Attendre le prochain frame
         }
+
+        // Déplacer l'objet directement à la position finale au cas où la boucle ne l'a pas fait
+        item.transform.position = endPosition;
 
         // Détruire l'objet après le fondu
         Destroy(item);
     }
+
 }
