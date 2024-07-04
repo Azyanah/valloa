@@ -20,9 +20,14 @@ public class InteractBehaviour : MonoBehaviour
     [SerializeField]
     private float raySpreadAngle = 30f;
 
+    [SerializeField]
+    private float rayElevation = 1.5f; 
+
     void Update()
     {
         bool itemDetected = false;
+
+        Vector3 rayStartPosition = transform.position + Vector3.up * rayElevation;
 
         for (int i = 0; i < numberOfRays; i++)
         {
@@ -30,12 +35,12 @@ public class InteractBehaviour : MonoBehaviour
             Quaternion rotation = Quaternion.AngleAxis(angle, Vector3.up);
             Vector3 direction = rotation * transform.forward;
 
-            Debug.DrawRay(transform.position, direction * interactRange, Color.red);
+            Debug.DrawRay(rayStartPosition, direction * interactRange, Color.red);
 
             RaycastHit hit;
-            if (Physics.Raycast(transform.position, direction, out hit, interactRange))
+            if (Physics.Raycast(rayStartPosition, direction * interactRange, out hit, interactRange))
             {
-                if (hit.collider.CompareTag("Item"))
+                if (hit.collider.CompareTag("Harvestable"))
                 {
                     if (Input.GetKeyDown(KeyCode.E))
                     {

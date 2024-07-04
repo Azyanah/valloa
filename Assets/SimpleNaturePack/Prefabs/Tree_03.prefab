@@ -115,7 +115,7 @@ GameObject:
   - component: {fileID: 4355761401392914105}
   m_Layer: 0
   m_Name: Tree_03_LOD0
-  m_TagString: Item
+  m_TagString: Harvestable
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
