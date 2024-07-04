@@ -617,118 +617,6 @@ namespace Polyperfect.Common
             }
         }
 
-          void UpdateAI()
-        {
-            if (CurrentState == WanderState.Dead) {
-                Debug.LogError("Trying to update the AI of a dead animal, something probably went wrong somewhere.");
-                return;
-            }
-
-            var position = transform.position;
-            primaryPursuer = null;
-            if (awareness > 0) {
-                var closestDistance = awareness;
-                if (allAnimals.Count > 0) {
-                    foreach (var chaser in allAnimals) {
-                        if (chaser.primaryPrey != this && chaser.attackTarget != this)
-                            continue;
-
-                        if (chaser.CurrentState == WanderState.Dead)
-                            continue;
-                        var distance = Vector3.Distance(position, chaser.transform.position);
-                        if ((chaser.attackTarget!=this && chaser.stealthy) || chaser.dominance <= this.dominance || distance > closestDistance)
-                            continue;
-                        
-                        closestDistance = distance;
-                        primaryPursuer = chaser;
-                    }
-                }
-            }
-
-            var wasSameTarget = false;
-            if (primaryPrey) {
-                if (primaryPrey.CurrentState == WanderState.Dead)
-                    primaryPrey = null;
-                else {
-                    var distanceToPrey = Vector3.Distance(position, primaryPrey.transform.position);
-                    if (distanceToPrey > scent)
-                        primaryPrey = null;
-                    else
-                        wasSameTarget = true;
-                }
-            }
-            if (!primaryPrey) {
-                primaryPrey = null;
-                if (dominance > 0 && attackingStates.Length > 0) {
-                    var aggFrac = aggression * .01f;
-                    aggFrac *= aggFrac;
-                    var closestDistance = scent;
-                    foreach (var potentialPrey in allAnimals) {
-                        if (potentialPrey.CurrentState == WanderState.Dead)
-                            continue;
-                        if (potentialPrey == this || (potentialPrey.species == species && !territorial) ||
-                            potentialPrey.dominance > dominance || potentialPrey.stealthy)
-                            continue;
-                        if (!agressiveTowards.Contains(potentialPrey.species))
-                            continue;
-                        
-                        if (Random.Range(0f,0.99999f) >= aggFrac && food > 60f)
-                            continue;
-                        
-                        var preyPosition = potentialPrey.transform.position;
-                        if (!IsValidLocation(preyPosition)) 
-                            continue;
-
-                        var distance = Vector3.Distance(position, preyPosition);
-                        if (distance > closestDistance)
-                            continue;
-                        
-                        closestDistance = distance;
-                        primaryPrey = potentialPrey;
-                    }
-                }
-            }
-
-            var aggressiveOption = false;
-            if (primaryPrey) {
-                if ((wasSameTarget&&stamina>0) || stamina > MinimumStaminaForAggression)
-                    aggressiveOption = true;
-                else
-                    primaryPrey = null;
-            }
-
-            var defensiveOption = false;
-            if (primaryPursuer && !aggressiveOption) {
-                if (stamina > MinimumStaminaForFlee)
-                    defensiveOption = true;
-            }
-
-            var updateTargetAI = false;
-            var isPreyInAttackRange = aggressiveOption && Vector3.Distance(position, primaryPrey.transform.position) < CalcAttackRange(primaryPrey);
-            var isPursuerInAttackRange = defensiveOption && defend && Vector3.Distance(position, primaryPursuer.transform.position) < CalcAttackRange(primaryPursuer);
-            if (isPursuerInAttackRange) {
-                attackTarget = primaryPursuer;
-            } else if (isPreyInAttackRange) {
-                attackTarget = primaryPrey;
-                if (!attackTarget.attackTarget==this)
-                    updateTargetAI = true;
-            } else
-                attackTarget = null;
-            var shouldAttack = attackingStates.Length > 0 && (isPreyInAttackRange || isPursuerInAttackRange);
-
-            if (shouldAttack)
-                SetState(WanderState.Attack);
-            else if (aggressiveOption)
-                SetState(WanderState.Chase);
-            else if (defensiveOption)
-                SetState(WanderState.Evade);
-            else if (CurrentState!= WanderState.Idle && CurrentState != WanderState.Wander)
-                SetState(WanderState.Idle);
-            if (shouldAttack&&updateTargetAI) 
-                attackTarget.forceUpdate = true;
-        }
-
-
         void UpdateAI()
         {
             if (CurrentState == WanderState.Dead)
@@ -801,8 +689,8 @@ namespace Polyperfect.Common
                     var distance = Vector3.Distance(position, preyPosition);
                     if (distance > closestDistance)
                         continue;
-                    if (logChanges)
-                        Debug.Log(string.Format("{0}: Found prey ({1}), chasing.", gameObject.name, potentialPrey.gameObject.name));
+                    // if (logChanges)
+                    //     Debug.Log(string.Format("{0}: Found prey ({1}), chasing.", gameObject.name, potentialPrey.gameObject.name));
 
                     closestDistance = distance;
                     primaryPrey = potentialPrey;
@@ -858,6 +746,136 @@ namespace Polyperfect.Common
                 StartCoroutine(GrowBaby());
             }
         }
+
+        // void UpdateAI()
+        // {
+        //     if (CurrentState == WanderState.Dead)
+        //     {
+        //         Debug.LogError("Trying to update the AI of a dead animal, something probably went wrong somewhere.");
+        //         return;
+        //     }
+
+        //     var position = transform.position;
+        //     primaryPursuer = null;
+        //    /* if (awareness > 0)
+        //     {
+        //         var closestDistance = awareness;
+        //         if (allAnimals.Count > 0)
+        //         {
+        //             int sameSpeciesPursuersCount = 0;
+        //             foreach (var chaser in allAnimals)
+        //             {
+        //                 if (chaser.primaryPrey != this && chaser.attackTarget != this)
+        //                     continue;
+
+        //                 if (chaser.CurrentState == WanderState.Dead || chaser.CurrentState == WanderState.Reproduction)
+        //                     continue;
+        //                 if (chaser.species != this.species)
+        //                     continue;
+
+        //                 sameSpeciesPursuersCount++;
+        //                 if (sameSpeciesPursuersCount > 2)
+        //                     break;
+        //                 print(sameSpeciesPursuersCount + "    " + chaser.species);
+        //                 var distance = Vector3.Distance(position, chaser.transform.position);
+        //                 if ((chaser.attackTarget != this && chaser.stealthy) || distance > closestDistance)
+        //                     continue;
+        //                 closestDistance = distance;
+        //                 primaryPursuer = chaser;
+        //             }
+        //         }
+        //     }*/
+
+        //     var wasSameTarget = false;
+        //     if (primaryPrey)
+        //     {
+        //         if (primaryPrey.CurrentState == WanderState.Dead)
+        //             primaryPrey = null;
+        //         else
+        //         {
+        //             var distanceToPrey = Vector3.Distance(position, primaryPrey.transform.position);
+        //             if (distanceToPrey > scent)
+        //                 primaryPrey = null;
+        //             else
+        //                 wasSameTarget = true;
+        //         }
+        //     }
+        //     if (!primaryPrey) // Vérifier la dominance pour indiquer que l'animal peut être en reproduction ou non
+        //     {
+        //         primaryPrey = null;
+
+        //         var closestDistance = 5f;
+        //         foreach (var potentialPrey in allAnimals)
+        //         {
+        //             if (potentialPrey.CurrentState == WanderState.Dead)
+        //                 Debug.LogError(string.Format("Dead animal found: {0}", potentialPrey.gameObject.name));
+        //             if (potentialPrey == this || potentialPrey.species != species)
+        //                 continue;
+
+        //             var preyPosition = potentialPrey.transform.position;
+        //             if (!IsValidLocation(preyPosition))
+        //                 continue;
+
+        //             var distance = Vector3.Distance(position, preyPosition);
+        //             if (distance > closestDistance)
+        //                 continue;
+        //             if (logChanges)
+        //                 Debug.Log(string.Format("{0}: Found prey ({1}), chasing.", gameObject.name, potentialPrey.gameObject.name));
+
+        //             closestDistance = distance;
+        //             primaryPrey = potentialPrey;
+        //         }
+        //     }
+
+        //     var aggressiveOption = false;
+        //     if (primaryPrey)
+        //     {
+        //         if ((wasSameTarget && stamina > 0) || stamina > MinimumStaminaForReproduction)
+        //             aggressiveOption = true;
+        //         else
+        //             primaryPrey = null;
+        //     }
+
+        //     var defensiveOption = false;
+        //     if (primaryPursuer && !aggressiveOption)
+        //     {
+        //         if (stamina > MinimumStaminaForFlee)
+        //             defensiveOption = true;
+        //     }
+
+        //     var updateTargetAI = false;
+        //     var isPreyInAttackRange = aggressiveOption && Vector3.Distance(position, primaryPrey.transform.position) < CalcAttackRange(primaryPrey);
+        //     var isPursuerInAttackRange = defensiveOption && Vector3.Distance(position, primaryPursuer.transform.position) < CalcAttackRange(primaryPursuer);
+        //     if (isPursuerInAttackRange)
+        //     {
+        //         attackTarget = primaryPursuer;
+        //     }
+        //     else if (isPreyInAttackRange)
+        //     {
+        //         attackTarget = primaryPrey;
+        //         if (!attackTarget.attackTarget == this)
+        //             updateTargetAI = true;
+        //     }
+        //     else
+        //         attackTarget = null;
+        //     var shouldAttack = attackingStates.Length > 0 && (isPreyInAttackRange || isPursuerInAttackRange);
+
+        //     if (shouldAttack) {
+        //         print("             Should attack");
+        //         SetState(WanderState.Attack);
+        //     }
+        //     else if (aggressiveOption) {
+        //         SetState(WanderState.Reproduction);              
+        //     }
+        //     else if (defensiveOption) {
+        //         SetState(WanderState.Evade);
+        //     }
+        //     else if (CurrentState != WanderState.Idle && CurrentState != WanderState.Wander) {
+        //         print("!= idle != wander");
+        //         SetState(WanderState.Wander);
+        //         StartCoroutine(GrowBaby());
+        //     }
+        // }
 
         IEnumerator GrowBaby()
         {
