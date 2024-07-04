@@ -61,7 +61,7 @@ public class InteractBehaviour : MonoBehaviour
             playerAnimator.SetTrigger("Harvest");
         }
 
-        yield return new WaitForSeconds(3f);
+        yield return new WaitForSeconds(2f);
 
         Harvestable harvestable = itemCollider.GetComponentInParent<Harvestable>();
         if (harvestable != null) {
