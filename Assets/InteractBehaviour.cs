@@ -15,30 +15,48 @@ public class InteractBehaviour : MonoBehaviour
     [SerializeField]
     private GameObject interactText;
 
+    [SerializeField]
+    private int numberOfRays = 5;
+    [SerializeField]
+    private float raySpreadAngle = 30f;
+
     void Update()
     {
-        RaycastHit hit;
-        if (Physics.Raycast(transform.position, transform.forward, out hit, interactRange))
+        bool itemDetected = false;
+
+        for (int i = 0; i < numberOfRays; i++)
         {
-            if (hit.collider.CompareTag("Item"))
+            float angle = (i - (numberOfRays / 2f)) * (raySpreadAngle / numberOfRays);
+            Quaternion rotation = Quaternion.AngleAxis(angle, Vector3.up);
+            Vector3 direction = rotation * transform.forward;
+
+            Debug.DrawRay(transform.position, direction * interactRange, Color.red);
+
+            RaycastHit hit;
+            if (Physics.Raycast(transform.position, direction, out hit, interactRange))
             {
-                if (Input.GetKeyDown(KeyCode.E))
+                if (hit.collider.CompareTag("Item"))
                 {
-                    axeVisual.SetActive(true);
-                    StartCoroutine(HarvestAfterWait(hit.collider));
+                    if (Input.GetKeyDown(KeyCode.E))
+                    {
+                        axeVisual.SetActive(true);
+                        StartCoroutine(HarvestAfterWait(hit.collider));
+                    }
+                    interactText.SetActive(true);
+                    itemDetected = true;
+                    break;
                 }
-                interactText.SetActive(true);
             }
-            else
-            {
-                interactText.SetActive(false);
-            }
+        }
+
+        if (!itemDetected)
+        {
+            interactText.SetActive(false);
         }
     }
 
     private IEnumerator HarvestAfterWait(Collider itemCollider)
     {
-        // Déclencher l'animation de récolte
         if (playerAnimator != null)
         {
             playerAnimator.SetTrigger("Harvest");
@@ -49,10 +67,8 @@ public class InteractBehaviour : MonoBehaviour
             Debug.LogWarning("playerAnimator est nul, animation non déclenchée");
         }
 
-        // Attendre 3 secondes avant de commencer le fondu et la destruction
-        yield return new WaitForSeconds(1.5f);
+        yield return new WaitForSeconds(3f);
 
-        // Vérifier si l'objet ou son parent a un composant Harvestable et appeler la méthode Harvest
         Harvestable harvestable = itemCollider.GetComponentInParent<Harvestable>();
         if (harvestable != null)
         {
